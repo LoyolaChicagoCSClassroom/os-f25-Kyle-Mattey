@@ -24,6 +24,7 @@ SDIR = src
 OBJS = \
 	kernel_main.o \
 	rprintf.o \
+	page.o \
 
 OBJ = $(patsubst %,$(ODIR)/%,$(OBJS))
 
