@@ -1,23 +1,20 @@
-cat > src/page.h <<'EOF'
-#ifndef PAGE_H
-#define PAGE_H
+#ifndef __PAGE_H__
+#define __PAGE_H__
 
-#include <stdint.h>
-
+// Physical page structure
 struct ppage {
     struct ppage *next;
     struct ppage *prev;
     void *physical_addr;
 };
 
-/* Initialize the page frame allocator list */
+// Initialize page frame allocator
 void init_pfa_list(void);
 
-/* Allocate npages contiguous physical pages from the free list */
+// Allocate physical pages
 struct ppage *allocate_physical_pages(unsigned int npages);
 
-/* Return a list of pages back to the free list */
+// Free physical pages
 void free_physical_pages(struct ppage *ppage_list);
 
-#endif // PAGE_H
-EOF
+#endif
