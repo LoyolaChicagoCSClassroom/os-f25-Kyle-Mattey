@@ -1,5 +1,4 @@
 UNAME_M := $(shell uname -m)
-
 ifeq ($(UNAME_M),aarch64)
 PREFIX:=i386-unknown-elf-
 BOOTIMG:=/usr/local/grub/lib/grub/i386-pc/boot.img
@@ -12,6 +11,7 @@ endif
 
 CC := $(PREFIX)gcc
 LD := $(PREFIX)ld
+AS := $(PREFIX)as
 OBJDUMP := $(PREFIX)objdump
 OBJCOPY := $(PREFIX)objcopy
 SIZE := $(PREFIX)size
@@ -25,6 +25,12 @@ OBJS = \
 	kernel_main.o \
 	rprintf.o \
 	page.o \
+	interrupt.o \
+	keyboard.o \
+	ide.o \
+	fat.o \
+	isr.o \
+	ide_asm.o
 
 OBJ = $(patsubst %,$(ODIR)/%,$(OBJS))
 
@@ -32,7 +38,13 @@ $(ODIR)/%.o: $(SDIR)/%.c
 	$(CC) $(CFLAGS) -c -g -o $@ $^
 
 $(ODIR)/%.o: $(SDIR)/%.s
-	$(CC) $(CFLAGS) -c -g -o $@ $^
+	$(AS) --32 -g -o $@ $^
+
+$(ODIR)/isr.o: $(SDIR)/isr.s
+	$(AS) --32 -g -o $@ $^
+
+$(ODIR)/ide_asm.o: $(SDIR)/ide.s
+	$(AS) --32 -g -o $@ $^
 
 all: bin rootfs.img
 
@@ -53,6 +65,11 @@ rootfs.img:
 	mcopy -i rootfs.img@@1M kernel ::/
 	mmd -i rootfs.img@@1M boot
 	mcopy -i rootfs.img@@1M grub.cfg ::/boot
+	@echo ""
+	@echo "=== Adding test file to disk image ==="
+	@echo "This is a test file for FAT filesystem driver" > testfile.txt
+	mcopy -i rootfs.img@@1M testfile.txt ::/
+	rm -f testfile.txt
 	@echo " -- BUILD COMPLETED SUCCESSFULLY --"
 
 run:
@@ -62,4 +79,6 @@ debug:
 	./launch_qemu.sh
 
 clean:
-	rm -f grub.img kernel rootfs.img obj/*
+	rm -f grub.img kernel rootfs.img obj/* testfile.txt
+
+.PHONY: all bin run debug clean
