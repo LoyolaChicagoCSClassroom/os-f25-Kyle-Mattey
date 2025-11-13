@@ -1,74 +1,69 @@
-cat > src/page.c <<'EOF'
 #include "page.h"
-#include <stddef.h>
 #include <stdint.h>
 
-/* Statically allocate 128 physical page descriptors (2MB each = 256MB total) */
-static struct ppage physical_page_array[128];
-static struct ppage *free_physical_pages = NULL;
+#define NUM_PAGES 128
+#define PAGE_SIZE (2 * 1024 * 1024)
+#define PHYS_MEM_START 0x00100000
 
-/* Initialize the linked list of free physical pages */
+struct ppage physical_page_array[NUM_PAGES];
+static struct ppage *free_physical_pages = 0;
+
 void init_pfa_list(void) {
-    for (int i = 0; i < 128; i++) {
-        physical_page_array[i].physical_addr = (void *)((uintptr_t)i * 0x200000);
-        physical_page_array[i].next = (i < 127) ? &physical_page_array[i + 1] : NULL;
-        physical_page_array[i].prev = (i > 0) ? &physical_page_array[i - 1] : NULL;
+    for (int i = 0; i < NUM_PAGES; i++) {
+        physical_page_array[i].physical_addr = (void*)(PHYS_MEM_START + (i * PAGE_SIZE));
+        physical_page_array[i].next = (i < NUM_PAGES - 1) ? &physical_page_array[i + 1] : 0;
+        physical_page_array[i].prev = (i > 0) ? &physical_page_array[i - 1] : 0;
     }
     free_physical_pages = &physical_page_array[0];
 }
 
-/* Helper: unlink a single page from the head of the free list */
-static struct ppage *unlink_head(void) {
-    if (free_physical_pages == NULL) return NULL;
-    struct ppage *p = free_physical_pages;
-    free_physical_pages = p->next;
-    if (free_physical_pages) free_physical_pages->prev = NULL;
-    p->next = NULL;
-    p->prev = NULL;
-    return p;
-}
-
-/* Allocate npages contiguous physical pages */
 struct ppage *allocate_physical_pages(unsigned int npages) {
-    if (npages == 0) return NULL;
-
-    struct ppage *head = NULL;
-    struct ppage *tail = NULL;
-
-    for (unsigned int i = 0; i < npages; i++) {
-        struct ppage *p = unlink_head();
-        if (!p) {
-            /* Out of free pages — rollback */
-            if (head) {
-                free_physical_pages(head);
-            }
-            return NULL;
-        }
-        if (!head) {
-            head = p;
-            tail = p;
-        } else {
-            tail->next = p;
-            p->prev = tail;
-            tail = p;
-        }
+    if (npages == 0 || free_physical_pages == 0) {
+        return 0;
     }
-    return head;
+    
+    struct ppage *current = free_physical_pages;
+    unsigned int count = 0;
+    while (current != 0 && count < npages) {
+        current = current->next;
+        count++;
+    }
+    
+    if (count < npages) {
+        return 0;
+    }
+    
+    struct ppage *allocated_list = free_physical_pages;
+    struct ppage *last_allocated = free_physical_pages;
+    
+    for (unsigned int i = 0; i < npages - 1; i++) {
+        last_allocated = last_allocated->next;
+    }
+    
+    free_physical_pages = last_allocated->next;
+    if (free_physical_pages != 0) {
+        free_physical_pages->prev = 0;
+    }
+    
+    last_allocated->next = 0;
+    
+    return allocated_list;
 }
 
-/* Return a list of pages back to the free list */
 void free_physical_pages(struct ppage *ppage_list) {
-    if (!ppage_list) return;
-
-    struct ppage *tail = ppage_list;
-    while (tail->next) tail = tail->next;
-
-    /* Attach to front of free list */
-    tail->next = free_physical_pages;
-    if (free_physical_pages)
-        free_physical_pages->prev = tail;
-
-    ppage_list->prev = NULL;
+    if (ppage_list == 0) {
+        return;
+    }
+    
+    struct ppage *last = ppage_list;
+    while (last->next != 0) {
+        last = last->next;
+    }
+    
+    last->next = free_physical_pages;
+    if (free_physical_pages != 0) {
+        free_physical_pages->prev = last;
+    }
     free_physical_pages = ppage_list;
+    ppage_list->prev = 0;
 }
-EOF
