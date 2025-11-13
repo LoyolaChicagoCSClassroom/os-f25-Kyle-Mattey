@@ -22,17 +22,15 @@ ODIR = obj
 SDIR = src
 
 OBJS = \
-        kernel_main.o \
-        rprintf.o \
-        page.o \
-        interrupt.o \
-        keyboard.o \
-        pit.o \
-        ide.o \
-        fat.o \
-        fstest.o \
-        isr.o \
-        ide_asm.o
+    kernel_main.o \
+    rprintf.o \
+    page.o \
+    interrupt.o \
+    keyboard.o \
+    ide.o \
+    fat.o \
+    isr.o \
+    ide_asm.o
 
 OBJ = $(patsubst %,$(ODIR)/%,$(OBJS))
 
